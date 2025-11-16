@@ -1,7 +1,10 @@
-// index.js  (YT Auto Backend Demo)
+// ---- YT AUTO BACKEND (Upload Enabled) ---- //
 
 const express = require("express");
 const cors = require("cors");
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -9,63 +12,103 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Root route – just to check server
+// ---- Your API Key (Put yours here) ---- //
+const API_KEY = "AIzaSyDJaeoj7o9fLrYb7RJWdnhOUnhE1zFuk2Q";
+
+// Root Route
 app.get("/", (req, res) => {
-  res.send("✅ YT Auto Backend is LIVE (demo)");
+  res.send("🚀 YT Auto Backend LIVE | Upload Enabled");
 });
 
-// 1) Generate Video (demo)
+
+// ----------- UPLOAD ROUTE (REAL UPLOAD) ---------------
+app.post("/upload-video", async (req, res) => {
+  try {
+    const { videoUrl, title, description } = req.body;
+
+    if (!videoUrl) return res.json({ error: "videoUrl missing!" });
+
+    // Download Video File
+    const filePath = path.join(__dirname, "video.mp4");
+    const writer = fs.createWriteStream(filePath);
+
+    const response = await axios({
+      url: videoUrl,
+      method: "GET",
+      responseType: "stream"
+    });
+
+    response.data.pipe(writer);
+
+    await new Promise((resolve) => writer.on("finish", resolve));
+
+
+    // ---- Upload via YouTube API ---- //
+    const uploadResponse = await axios.post(
+      `https://www.googleapis.com/upload/youtube/v3/videos?uploadType=media&part=snippet,status&key=${API_KEY}`,
+      fs.readFileSync(filePath),
+      {
+        headers: {
+          "Content-Type": "video/*"
+        }
+      }
+    );
+
+    const videoId = uploadResponse.data.id;
+
+    // Set Video Title & Description
+    await axios.put(
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet&key=${API_KEY}`,
+      {
+        id: videoId,
+        snippet: {
+          title: title || "AI Auto Upload Video",
+          description: description || "Uploaded automatically via API 😎",
+          categoryId: "22"
+        }
+      }
+    );
+
+    res.json({
+      status: "success",
+      videoId,
+      message: "🔥 Your video uploaded successfully!"
+    });
+
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
+
+
+
+
+// -------- Old Demo Routes (unchanged) ----------
 app.get("/generate-video", (req, res) => {
   res.json({
     step: "generate-video",
     status: "ok",
-    message: "Demo: AI ने वीडियो बना दी (अभी सिर्फ टेक्स्ट response है)."
+    message: "Demo: AI ने वीडियो बना दी (demo)."
   });
 });
 
-// 2) Generate Thumbnail (demo)
 app.get("/generate-thumbnail", (req, res) => {
   res.json({
     step: "generate-thumbnail",
     status: "ok",
-    message: "Demo: AI ने thumbnail बना दी (अभी सिर्फ टेक्स्ट response है)."
+    message: "Demo: Thumbnail ready (demo)."
   });
 });
 
-// 3) SEO Optimize (demo)
 app.get("/seo-optimize", (req, res) => {
   res.json({
     step: "seo-optimize",
     status: "ok",
-    message: "Demo: Title, Description और Tags SEO optimized हैं (demo)."
+    message: "Demo: SEO done (demo)."
   });
 });
 
-// 4) Upload to YouTube (demo)
-app.get("/upload-video", (req, res) => {
-  res.json({
-    step: "upload-video",
-    status: "ok",
-    message: "Demo: वीडियो YouTube पर upload मानी जा रही है (अभी सच में नहीं)."
-  });
-});
-
-// 5) FULL AUTO – 1 click में सब
-app.get("/full-auto", (req, res) => {
-  res.json({
-    step: "full-auto",
-    status: "ok",
-    message: "Demo: पूरा process पूरा हो गया ✅",
-    details: {
-      video: "Video generated (demo)",
-      thumbnail: "Thumbnail generated (demo)",
-      seo: "SEO done (demo)",
-      upload: "Uploaded to YouTube (demo)"
-    },
-    note: "यह सिर्फ demo backend है. बाद में यहीं पर असली AI + YouTube API लगाएंगे."
-  });
-});
 
 app.listen(PORT, () => {
-  console.log("YT Auto Backend running on port", PORT);
+  console.log("YT Auto Backend (Upload Enabled) running on port", PORT);
 });
